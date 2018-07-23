@@ -1,0 +1,10 @@
+hostname = "127.0.0.1"
+port = 8161
+threadCount = 4
+
+repositories = [
+    {
+        name = "test",
+        paths = ["src/main/resources/test-repo"]
+    }
+]

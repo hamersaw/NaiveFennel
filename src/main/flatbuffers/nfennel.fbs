@@ -1,0 +1,38 @@
+namespace com.bushpath.nfennel.flatbuffers;
+
+enum MessageType:short {
+    Data,
+    Failure,
+    Query,
+    Write
+}
+
+table DataRequest {
+    id:long;
+}
+
+table DataResponse {
+    data:[byte]; 
+}
+
+table Failure {
+    message:string;
+}
+
+table QueryRequest {
+    query:[byte];
+    bufferSize:int;
+}
+
+table QueryResponse {
+    id:long;
+    features:[string];
+}
+
+table WriteRequest {
+    filename:string;
+    features:[string];
+}
+
+table WriteResponse {
+}

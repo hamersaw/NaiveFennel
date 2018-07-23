@@ -1,0 +1,16 @@
+#!/bin/sh
+APPLICATION="nfennel-node"
+VERSION="0.1-SNAPSHOT"
+
+JAVA_OPTS="-Dorg.slf4j.simpleLogger.defaultLogLevel=trace"
+
+CLASSPATH=""
+BASEDIR=$(dirname $0)
+if [ -f $BASEDIR/build/libs/$APPLICATION-$VERSION.jar ]; then
+    CLASSPATH="$BASEDIR/build/libs/$APPLICATION-$VERSION.jar"
+else
+    echo "unable to find $APPLICATION-$VERSION.jar."
+    exit 1
+fi
+
+java -cp $CLASSPATH $JAVA_OPTS com.bushpath.nfennel.node.Main $@

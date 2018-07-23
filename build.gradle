@@ -1,0 +1,12 @@
+apply plugin: 'java'
+
+// define repositories
+repositories {
+    mavenCentral()
+}
+
+// define dependencies
+dependencies {
+    compile 'com.google.flatbuffers:flatbuffers-java:1.9.0'
+    compile 'org.zeromq:jeromq:0.4.3'
+}

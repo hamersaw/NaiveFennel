@@ -1,0 +1,16 @@
+#!/bin/sh
+APPLICATION="nfennel"
+VERSION="0.1-SNAPSHOT"
+
+JAVA_OPTS=""
+
+CLASSPATH=""
+BASEDIR=$(dirname $0)
+if [ -f $BASEDIR/build/libs/$APPLICATION-$VERSION.jar ]; then
+    CLASSPATH="$BASEDIR/build/libs/$APPLICATION-$VERSION.jar"
+else
+    echo "unable to find $APPLICATION-$VERSION.jar."
+    exit 1
+fi
+
+java -cp $CLASSPATH $JAVA_OPTS com.bushpath.nfennel.cli.Main $@
