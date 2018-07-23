@@ -17,23 +17,25 @@ public final class WriteRequest extends Table {
   public String filename() { int o = __offset(4); return o != 0 ? __string(o + bb_pos) : null; }
   public ByteBuffer filenameAsByteBuffer() { return __vector_as_bytebuffer(4, 1); }
   public ByteBuffer filenameInByteBuffer(ByteBuffer _bb) { return __vector_in_bytebuffer(_bb, 4, 1); }
-  public String features(int j) { int o = __offset(6); return o != 0 ? __string(__vector(o) + j * 4) : null; }
-  public int featuresLength() { int o = __offset(6); return o != 0 ? __vector_len(o) : 0; }
+  public byte data(int j) { int o = __offset(6); return o != 0 ? bb.get(__vector(o) + j * 1) : 0; }
+  public int dataLength() { int o = __offset(6); return o != 0 ? __vector_len(o) : 0; }
+  public ByteBuffer dataAsByteBuffer() { return __vector_as_bytebuffer(6, 1); }
+  public ByteBuffer dataInByteBuffer(ByteBuffer _bb) { return __vector_in_bytebuffer(_bb, 6, 1); }
 
   public static int createWriteRequest(FlatBufferBuilder builder,
       int filenameOffset,
-      int featuresOffset) {
+      int dataOffset) {
     builder.startObject(2);
-    WriteRequest.addFeatures(builder, featuresOffset);
+    WriteRequest.addData(builder, dataOffset);
     WriteRequest.addFilename(builder, filenameOffset);
     return WriteRequest.endWriteRequest(builder);
   }
 
   public static void startWriteRequest(FlatBufferBuilder builder) { builder.startObject(2); }
   public static void addFilename(FlatBufferBuilder builder, int filenameOffset) { builder.addOffset(0, filenameOffset, 0); }
-  public static void addFeatures(FlatBufferBuilder builder, int featuresOffset) { builder.addOffset(1, featuresOffset, 0); }
-  public static int createFeaturesVector(FlatBufferBuilder builder, int[] data) { builder.startVector(4, data.length, 4); for (int i = data.length - 1; i >= 0; i--) builder.addOffset(data[i]); return builder.endVector(); }
-  public static void startFeaturesVector(FlatBufferBuilder builder, int numElems) { builder.startVector(4, numElems, 4); }
+  public static void addData(FlatBufferBuilder builder, int dataOffset) { builder.addOffset(1, dataOffset, 0); }
+  public static int createDataVector(FlatBufferBuilder builder, byte[] data) { builder.startVector(1, data.length, 1); for (int i = data.length - 1; i >= 0; i--) builder.addByte(data[i]); return builder.endVector(); }
+  public static void startDataVector(FlatBufferBuilder builder, int numElems) { builder.startVector(1, numElems, 1); }
   public static int endWriteRequest(FlatBufferBuilder builder) {
     int o = builder.endObject();
     return o;

@@ -4,7 +4,9 @@ enum MessageType:short {
     Data,
     Failure,
     Query,
-    Write
+    WriterClose,
+    Write,
+    WriterOpen
 }
 
 table DataRequest {
@@ -29,10 +31,25 @@ table QueryResponse {
     features:[string];
 }
 
+table WriterCloseRequest {
+    filename:string;
+}
+
+table WriterCloseResponse {
+}
+
 table WriteRequest {
+    filename:string;
+    data:[byte];
+}
+
+table WriteResponse {
+}
+
+table WriterOpenRequest {
     filename:string;
     features:[string];
 }
 
-table WriteResponse {
+table WriterOpenResponse {
 }

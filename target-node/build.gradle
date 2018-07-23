@@ -1,0 +1,22 @@
+apply plugin: 'java'
+
+version '0.1-SNAPSHOT'
+
+// define repositories
+repositories {
+    mavenCentral()
+}
+
+// define dependencies
+dependencies {
+    compile fileTree(dir: '../libs', include: ['*.jar'])
+    compile project(':nfennel-shared')
+    compile 'com.moandjiezana.toml:toml4j:0.7.2'
+    compile 'org.slf4j:slf4j-simple:1.7.25'
+}
+
+jar {
+    from {
+        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}

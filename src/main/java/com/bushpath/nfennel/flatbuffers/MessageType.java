@@ -7,9 +7,11 @@ public final class MessageType {
   public static final short Data = 0;
   public static final short Failure = 1;
   public static final short Query = 2;
-  public static final short Write = 3;
+  public static final short WriterClose = 3;
+  public static final short Write = 4;
+  public static final short WriterOpen = 5;
 
-  public static final String[] names = { "Data", "Failure", "Query", "Write", };
+  public static final String[] names = { "Data", "Failure", "Query", "WriterClose", "Write", "WriterOpen", };
 
   public static String name(int e) { return names[e]; }
 }

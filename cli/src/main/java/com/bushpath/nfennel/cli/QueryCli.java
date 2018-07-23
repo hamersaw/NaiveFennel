@@ -16,14 +16,25 @@ import com.bushpath.nfennel.flatbuffers.DataResponse;
 import com.bushpath.nfennel.flatbuffers.DataRequest;
 import com.bushpath.nfennel.flatbuffers.Failure;
 import com.bushpath.nfennel.flatbuffers.MessageType;
+import com.bushpath.nfennel.flatbuffers.WriterCloseResponse;
+import com.bushpath.nfennel.flatbuffers.WriterCloseRequest;
+import com.bushpath.nfennel.flatbuffers.WriterOpenResponse;
+import com.bushpath.nfennel.flatbuffers.WriterOpenRequest;
+import com.bushpath.nfennel.flatbuffers.WriteResponse;
+import com.bushpath.nfennel.flatbuffers.WriteRequest;
 import com.bushpath.nfennel.flatbuffers.QueryResponse;
 import com.bushpath.nfennel.flatbuffers.QueryRequest;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.ObjectOutputStream;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Map;
+import java.util.List;
 
 @Command(name = "query",
     description = "Issue a query to NaiveFennel nodes.",
@@ -55,6 +66,47 @@ public class QueryCli implements Runnable {
             Toml toml = new Toml();
             toml.read(new File(this.configurationFile));
 
+            List<Object> targetNodes = toml.getList("target_nodes");
+            List<double[]>[] buffers = new List[targetNodes.size()];
+            int bufferIndex = 0;
+
+            /**
+             * open writers on target-nodes
+             */
+            /*// create WriterOpenRequest
+            FlatBufferBuilder woFlatBufferBuilder = new FlatBufferBuilder(1);
+
+            // add filename
+            int woFilenameIndex = woFlatBufferBuilder.createString(this.filename);
+
+            // add WriterOpenRequest
+            WriterOpenRequest.startWriterOpenRequest(woFlatBufferBuilder);
+            WriterOpenRequest.addFilename(woFlatBufferBuilder, woFilenameIndex);
+            int woRootIndex = WriterOpenRequest.endWriterOpenRequest(woFlatBufferBuilder);
+
+            // finalize byte array
+            woFlatBufferBuilder.finish(woRootIndex);
+            byte[] writerOpenRequest = woFlatBufferBuilder.sizedByteArray();
+
+            // opne writers on each target node
+            List<Object> targetNodes = toml.getList("target_nodes");
+            List<double[]>[] buffers = new List[targetNodes.size()];
+            int bufferIndex = 0;
+            for (int i=0; i<targetNodes.size(); i++) {
+                Map<String, Object> node = (Map) targetNodes.get(i);
+                String hostname = node.get("hostname").toString();
+                short port = ((Long) node.get("port")).shortValue();
+
+                // send WriterOpenRequest
+                byte[] woResponseBytes = Main.sendMessage(hostname, port,
+                    MessageType.WriterOpen, writerOpenRequest, null);
+
+                buffers[i] = new ArrayList();
+            }*/
+
+            /**
+             * issue queries to source nodes
+             */
             // parse query
             Parser parser = new FeatureRangeParser();
             Query query = parser.evaluate(this.queries);
@@ -70,8 +122,9 @@ public class QueryCli implements Runnable {
             objectOut.close(); 
             byteOut.close();
   
-            byte[] bytes = byteOut.toByteArray();
-            int queryIndex = QueryRequest.createQueryVector(qFlatBufferBuilder, bytes);
+            byte[] queryBytes = byteOut.toByteArray();
+            int queryIndex =
+                QueryRequest.createQueryVector(qFlatBufferBuilder, queryBytes);
 
             // add QueryRequest
             QueryRequest.startQueryRequest(qFlatBufferBuilder);
@@ -83,8 +136,8 @@ public class QueryCli implements Runnable {
             qFlatBufferBuilder.finish(rootIndex);
             byte[] queryRequest = qFlatBufferBuilder.sizedByteArray();
 
-            // iterate over nodes and issue queries
-            for (Object object : toml.getList("nodes")) {
+            boolean writersInitialized = false;
+            for (Object object : toml.getList("source_nodes")) {
                 Map<String, Object> node = (Map) object;
                 String hostname = node.get("hostname").toString();
                 short port = ((Long) node.get("port")).shortValue();
@@ -97,6 +150,56 @@ public class QueryCli implements Runnable {
                 ByteBuffer qByteBuffer = ByteBuffer.wrap(qResponseBytes);
                 QueryResponse queryResponse =
                     QueryResponse.getRootAsQueryResponse(qByteBuffer);
+
+                /**
+                 * initialize writers on target nodes
+                 */
+                if (!writersInitialized) {
+                    /**
+                     * open writers on target-nodes
+                     */
+                    // create WriterOpenRequest
+                    FlatBufferBuilder woFlatBufferBuilder = new FlatBufferBuilder(1);
+
+                    // add filename
+                    int woFilenameIndex = woFlatBufferBuilder.createString(this.filename);
+
+                    // add features
+                    int[] data = new int[queryResponse.featuresLength()];
+                    for (int i=0; i<queryResponse.featuresLength(); i++) {
+                        data[i] =
+                            woFlatBufferBuilder.createString(queryResponse.features(i));
+                    }
+
+                    int featuresIndex =
+                        WriterOpenRequest.createFeaturesVector(woFlatBufferBuilder, data);
+
+                    // add WriterOpenRequest
+                    WriterOpenRequest.startWriterOpenRequest(woFlatBufferBuilder);
+                    WriterOpenRequest.addFilename(woFlatBufferBuilder, woFilenameIndex);
+                    WriterOpenRequest.addFeatures(woFlatBufferBuilder, featuresIndex);
+                    int woRootIndex =
+                        WriterOpenRequest.endWriterOpenRequest(woFlatBufferBuilder);
+
+                    // finalize byte array
+                    woFlatBufferBuilder.finish(woRootIndex);
+                    byte[] writerOpenRequest = woFlatBufferBuilder.sizedByteArray();
+
+                    // opne writers on each target node
+                    for (int i=0; i<targetNodes.size(); i++) {
+                        Map<String, Object> n = (Map) targetNodes.get(i);
+                        String h = n.get("hostname").toString();
+                        short p = ((Long) n.get("port")).shortValue();
+
+                        // send WriterOpenRequest
+                        byte[] woResponseBytes = Main.sendMessage(h, p,
+                            MessageType.WriterOpen, writerOpenRequest, null);
+
+                        buffers[i] = new ArrayList();
+                    }
+
+                    writersInitialized = true;
+                }
 
                 // read all data
                 FlatBufferBuilder dFlatBufferBuilder = new FlatBufferBuilder(1);
@@ -121,7 +224,36 @@ public class QueryCli implements Runnable {
                     DataResponse dataResponse =
                         DataResponse.getRootAsDataResponse(dByteBuffer);
 
-                    // TODO - handle data
+                    // parse data and distribute over buffers
+                    byte[] bytes = new byte[dataResponse.dataLength()];
+                    for (int i=0; i<dataResponse.dataLength(); i++) {
+                        bytes[i] = dataResponse.data(i);
+                    }
+
+                    DataInputStream in =
+                        new DataInputStream(new ByteArrayInputStream(bytes));
+                    int bytesRead = 0;
+                    while (bytesRead < bytes.length) {
+                        double[] record = new double[queryResponse.featuresLength()];
+                        for (int i=0; i<record.length; i++) {
+                            record[i] = in.readDouble();
+                        }
+
+                        // add record to buffer
+                        buffers[bufferIndex].add(record);
+
+                        if (buffers[bufferIndex].size() == this.bufferSize) {
+                            Map<String, Object> n = (Map) targetNodes.get(bufferIndex);
+                            String h = n.get("hostname").toString();
+                            short p = ((Long) n.get("port")).shortValue();
+                            this.writeBuffer(h, p, buffers[bufferIndex], this.filename);
+                        }
+
+                        bufferIndex = (bufferIndex + 1) % buffers.length;
+                        bytesRead += record.length * 8;
+                    }
+
+                    in.close();
                     System.out.println("Received "
                         + dataResponse.dataLength() + " bytes");
 
@@ -131,8 +263,81 @@ public class QueryCli implements Runnable {
                     }
                 }
             }
+
+            /**
+             * close writers on target-nodes
+             */
+            // create WriterCloseRequest
+            FlatBufferBuilder wcFlatBufferBuilder = new FlatBufferBuilder(1);
+
+            // add filename
+            int wcFilenameIndex = wcFlatBufferBuilder.createString(this.filename);
+
+            // add WriterCloseRequest
+            WriterCloseRequest.startWriterCloseRequest(wcFlatBufferBuilder);
+            WriterCloseRequest.addFilename(wcFlatBufferBuilder, wcFilenameIndex);
+            int wcRootIndex =
+                WriterCloseRequest.endWriterCloseRequest(wcFlatBufferBuilder);
+
+            // finalize byte array
+            wcFlatBufferBuilder.finish(wcRootIndex);
+            byte[] writerCloseRequest = wcFlatBufferBuilder.sizedByteArray();
+
+            for (int i=0; i<targetNodes.size(); i++) {
+                Map<String, Object> node = (Map) targetNodes.get(i);
+                String hostname = node.get("hostname").toString();
+                short port = ((Long) node.get("port")).shortValue();
+
+                // send WriteRequest
+                if (!buffers[i].isEmpty()) {
+                    this.writeBuffer(hostname, port, buffers[i], this.filename);
+                }
+
+                // send WriterCloseRequest
+                byte[] wcResponseBytes = Main.sendMessage(hostname, port,
+                    MessageType.WriterClose, writerCloseRequest, null);
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    protected static void writeBuffer(String hostname, short port,
+            List<double[]> buffer, String filename) throws Exception {
+        // create WriteRequest
+        FlatBufferBuilder flatBufferBuilder = new FlatBufferBuilder(1);
+
+        // add filename
+        int filenameIndex = flatBufferBuilder.createString(filename);
+
+        // add data
+        ByteArrayOutputStream byteOut = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(byteOut);
+        for (double[] record : buffer) {
+            for (double d : record) {
+                out.writeDouble(d);
+            }
+        }
+
+        int dataIndex =
+            WriteRequest.createDataVector(flatBufferBuilder, byteOut.toByteArray());
+
+        // create WriteRequest
+        WriteRequest.startWriteRequest(flatBufferBuilder);
+        WriteRequest.addFilename(flatBufferBuilder, filenameIndex);
+        WriteRequest.addData(flatBufferBuilder, dataIndex);
+        int rootIndex = WriteRequest.endWriteRequest(flatBufferBuilder);
+        flatBufferBuilder.finish(rootIndex);
+
+        // finalize byte array
+        flatBufferBuilder.finish(rootIndex);
+        byte[] writeRequest = flatBufferBuilder.sizedByteArray();
+
+        // send message
+        byte[] responseBytes = Main.sendMessage(hostname, port,
+            MessageType.Write, writeRequest, null);
+
+        // clear buffer
+        buffer.clear();
     }
 }

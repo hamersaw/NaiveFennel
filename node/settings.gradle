@@ -1,4 +1,0 @@
-rootProject.name = 'nfennel-node'
-
-include ':nfennel-shared'
-project(':nfennel-shared').projectDir = new File(settingsDir, '../')
