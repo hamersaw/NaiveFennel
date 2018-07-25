@@ -60,6 +60,10 @@ public class QueryCli implements Runnable {
     @Option(names = {"-q", "--query"},
         description = "Feature range query (ie. 'f0:0..10', 'f1:0..', 'f2:..10').")
     private String[] queries;
+
+    @Option(names = {"-s", "--sample-probability"},
+        description = "Probability of an observation to be sampled [default=1.0].")
+    private double sampleProbability = 1.0;
  
     @Override
     public void run() {
@@ -94,6 +98,7 @@ public class QueryCli implements Runnable {
             QueryRequest.startQueryRequest(qFlatBufferBuilder);
             QueryRequest.addQuery(qFlatBufferBuilder, queryIndex);
 			QueryRequest.addBufferSize(qFlatBufferBuilder, this.bufferSize);
+            QueryRequest.addSampleProbability(qFlatBufferBuilder, this.sampleProbability);
             int rootIndex = QueryRequest.endQueryRequest(qFlatBufferBuilder);
 
             // finalize byte array

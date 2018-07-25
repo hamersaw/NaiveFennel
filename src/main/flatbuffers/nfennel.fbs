@@ -24,6 +24,7 @@ table Failure {
 table QueryRequest {
     query:[byte];
     bufferSize:int;
+    sampleProbability:double;
 }
 
 table QueryResponse {

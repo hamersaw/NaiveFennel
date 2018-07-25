@@ -19,21 +19,25 @@ public final class QueryRequest extends Table {
   public ByteBuffer queryAsByteBuffer() { return __vector_as_bytebuffer(4, 1); }
   public ByteBuffer queryInByteBuffer(ByteBuffer _bb) { return __vector_in_bytebuffer(_bb, 4, 1); }
   public int bufferSize() { int o = __offset(6); return o != 0 ? bb.getInt(o + bb_pos) : 0; }
+  public double sampleProbability() { int o = __offset(8); return o != 0 ? bb.getDouble(o + bb_pos) : 0.0; }
 
   public static int createQueryRequest(FlatBufferBuilder builder,
       int queryOffset,
-      int bufferSize) {
-    builder.startObject(2);
+      int bufferSize,
+      double sampleProbability) {
+    builder.startObject(3);
+    QueryRequest.addSampleProbability(builder, sampleProbability);
     QueryRequest.addBufferSize(builder, bufferSize);
     QueryRequest.addQuery(builder, queryOffset);
     return QueryRequest.endQueryRequest(builder);
   }
 
-  public static void startQueryRequest(FlatBufferBuilder builder) { builder.startObject(2); }
+  public static void startQueryRequest(FlatBufferBuilder builder) { builder.startObject(3); }
   public static void addQuery(FlatBufferBuilder builder, int queryOffset) { builder.addOffset(0, queryOffset, 0); }
   public static int createQueryVector(FlatBufferBuilder builder, byte[] data) { builder.startVector(1, data.length, 1); for (int i = data.length - 1; i >= 0; i--) builder.addByte(data[i]); return builder.endVector(); }
   public static void startQueryVector(FlatBufferBuilder builder, int numElems) { builder.startVector(1, numElems, 1); }
   public static void addBufferSize(FlatBufferBuilder builder, int bufferSize) { builder.addInt(1, bufferSize, 0); }
+  public static void addSampleProbability(FlatBufferBuilder builder, double sampleProbability) { builder.addDouble(2, sampleProbability, 0.0); }
   public static int endQueryRequest(FlatBufferBuilder builder) {
     int o = builder.endObject();
     return o;

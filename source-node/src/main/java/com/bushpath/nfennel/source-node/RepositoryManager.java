@@ -109,7 +109,7 @@ public class RepositoryManager {
             // create RepositoryReader
             RepositoryReader reader =
                 new RepositoryReader(this.repositories.get(query.getEntity()),
-                    query, request.bufferSize());
+                    query, request.bufferSize(), request.sampleProbability());
 
             id = random.nextLong();
             this.readers.put(id, reader);

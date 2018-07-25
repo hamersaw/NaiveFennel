@@ -7,16 +7,19 @@ import com.bushpath.rutils.reader.CsvReader;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 public class RepositoryReader {
     protected List<String> files;
     protected int fileIndex;
     protected int bufferSize;
+    protected double sampleProbability;
     protected CsvReader reader;
+    protected Random random;
     protected List<QueryWrapper> queries;
 
     public RepositoryReader(List<String> paths, Query query,
-            int bufferSize) throws Exception {
+            int bufferSize, double sampleProbability) throws Exception {
         // initialize files
         this.files = new ArrayList();
         for (String path : paths) {
@@ -32,7 +35,9 @@ public class RepositoryReader {
 
         this.fileIndex = 1;
         this.bufferSize = bufferSize;
+        this.sampleProbability = sampleProbability;
         this.reader = new CsvReader(files.get(0), null, null);
+        this.random = new Random(System.nanoTime());
 
         // initialize queries
         this.queries = new ArrayList();
@@ -95,6 +100,11 @@ public class RepositoryReader {
             } 
 
             if (!valid) {
+                continue;
+            }
+
+            // evaluate sample probability
+            if (this.random.nextDouble() > this.sampleProbability) {
                 continue;
             }
 
