@@ -1,8 +1,0 @@
-source_nodes = [
-    { hostname = "127.0.0.1", port = 8160 },
-    { hostname = "127.0.0.1", port = 8161 }
-]
-
-target_nodes = [
-    { hostname = "127.0.0.1", port = 9160 }
-]

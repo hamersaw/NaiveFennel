@@ -17,7 +17,7 @@ import java.nio.ByteBuffer;
     version = "0.1",
     description = "Cli application for NaiveFennel.",
     mixinStandardHelpOptions = true,
-    subcommands = {QueryCli.class})
+    subcommands = {DistributeCli.class, QueryCli.class})
 public class Main implements Runnable {
     public static void main(String[] args) {
         CommandLine.run(new Main(), System.err, args);
