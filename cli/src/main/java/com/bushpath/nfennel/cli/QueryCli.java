@@ -112,6 +112,8 @@ public class QueryCli implements Runnable {
                 String hostname = node.get("hostname").toString();
                 short port = ((Long) node.get("port")).shortValue();
 
+                System.out.println("querying '" + hostname + ":" + port + "'");
+
                 // send QueryRequest
                 byte[] qResponseBytes = Main.sendMessage(hostname, port,
                     MessageType.Query, queryRequest, null);

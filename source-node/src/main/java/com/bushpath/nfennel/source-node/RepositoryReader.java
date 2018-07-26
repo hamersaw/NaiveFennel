@@ -36,7 +36,9 @@ public class RepositoryReader {
         this.fileIndex = 1;
         this.bufferSize = bufferSize;
         this.sampleProbability = sampleProbability;
-        this.reader = new CsvReader(files.get(0), null, null);
+        if (files.length != 0) {
+            this.reader = new CsvReader(files.get(0), null, null);
+        }
         this.random = new Random(System.nanoTime());
 
         // initialize queries
