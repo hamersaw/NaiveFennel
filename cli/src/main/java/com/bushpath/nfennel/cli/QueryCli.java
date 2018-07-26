@@ -123,7 +123,7 @@ public class QueryCli implements Runnable {
                 QueryResponse queryResponse =
                     QueryResponse.getRootAsQueryResponse(qByteBuffer);
 
-                if (!writerInitialized) {
+                if (!writerInitialized && queryResponse.featuresLength() != 0) {
                     for (int i=0; i<queryResponse.featuresLength(); i++) {
                         out.write((i == 0 ? "" : ",") + queryResponse.features(i));
                     }

@@ -66,6 +66,10 @@ public class RepositoryReader {
     }
 
     public String[] getFeatures() {
+        if (this.files.size() == 0) {
+            return new String[]{};
+        }
+
         return this.reader.getFeatures();
     }
 
