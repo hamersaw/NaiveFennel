@@ -14,8 +14,8 @@ public class RepositoryReader {
     protected int fileIndex;
     protected int bufferSize;
     protected double sampleProbability;
-    protected CsvReader reader;
     protected Random random;
+    protected CsvReader reader;
     protected List<QueryWrapper> queries;
 
     public RepositoryReader(List<String> paths, Query query,
@@ -36,27 +36,28 @@ public class RepositoryReader {
         this.fileIndex = 1;
         this.bufferSize = bufferSize;
         this.sampleProbability = sampleProbability;
-        if (files.size() != 0) {
-            this.reader = new CsvReader(files.get(0), null, null);
-        }
         this.random = new Random(System.nanoTime());
 
-        // initialize queries
-        this.queries = new ArrayList();
-        String[] features = reader.getFeatures();
-        for (String feature : query.getFeatures()) {
-            int index = -1;
-            for (int j=0; j<features.length; j++) {
-                if (features[j].equals(feature)) {
-                    index = j;
+        if (files.size() != 0) {
+            this.reader = new CsvReader(files.get(0), null, null);
+
+            // initialize queries
+            this.queries = new ArrayList();
+            String[] features = reader.getFeatures();
+            for (String feature : query.getFeatures()) {
+                int index = -1;
+                for (int j=0; j<features.length; j++) {
+                    if (features[j].equals(feature)) {
+                        index = j;
+                    }
                 }
-            }
 
-            if (index == -1) {
-                continue;
-            }
+                if (index == -1) {
+                    continue;
+                }
 
-            queries.add(new QueryWrapper(query.getExpression(feature), index));
+                queries.add(new QueryWrapper(query.getExpression(feature), index));
+            }
         }
     }
 
