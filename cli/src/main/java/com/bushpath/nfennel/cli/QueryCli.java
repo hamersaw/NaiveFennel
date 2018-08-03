@@ -37,6 +37,9 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 @Command(name = "query",
     description = "Issue a query to NaiveFennel nodes and write data locally.",
@@ -64,6 +67,10 @@ public class QueryCli implements Runnable {
     @Option(names = {"-s", "--sample-probability"},
         description = "Probability of an observation to be sampled [default=1.0].")
     private double sampleProbability = 1.0;
+
+    @Option(names = {"-t", "--thread-count"},
+        description = "Number of threads to concurrently request data [default=8].")
+    private int threadCount = 8;
  
     @Override
     public void run() {
@@ -105,32 +112,140 @@ public class QueryCli implements Runnable {
             qFlatBufferBuilder.finish(rootIndex);
             byte[] queryRequest = qFlatBufferBuilder.sizedByteArray();
 
-            BufferedWriter out = new BufferedWriter(new FileWriter(this.filename));
-            boolean writerInitialized = false;
+            // initialize workers and writer
+            BlockingQueue<Map<String, Object>> nodeQueue = new ArrayBlockingQueue(256);
+            BlockingQueue<double[]> recordQueue = new ArrayBlockingQueue(4096);
+
+            Worker[] workers = new Worker[this.threadCount];
+            for (int i=0; i<workers.length; i++) {
+                workers[i] = new Worker(nodeQueue, recordQueue, queryRequest);
+                workers[i].start();
+            }
+
+            Writer writer = new Writer(recordQueue, this.filename);
+            writer.start();
+
+            // send nodes down queue
             for (Object object : toml.getList("source_nodes")) {
                 Map<String, Object> node = (Map) object;
+                while (!nodeQueue.offer(node)) {}
+            }
+
+            for (Worker worker : workers) {
+                worker.shutdown();
+                worker.join();
+            }
+
+            writer.shutdown();
+            writer.join();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    protected class Writer extends Thread {
+        protected BlockingQueue<double[]> in;
+        protected BufferedWriter out;
+        protected boolean shutdown;
+
+        public Writer(BlockingQueue in, String filename) {
+            this.in = in;
+            try {
+                this.out = new BufferedWriter(new FileWriter(filename));
+            } catch (Exception e) {
+                System.err.println(e.getMessage());
+            }
+
+            this.shutdown = false;
+        }
+
+        @Override
+        public void run() {
+
+            double[] record;
+            while (!this.in.isEmpty() || !this.shutdown) {
+                try {
+                    record = this.in.poll(5, TimeUnit.MILLISECONDS);
+                } catch (Exception e) {
+                    System.err.println(e.getMessage());
+                    continue;
+                }
+
+                if (record == null) {
+                    continue;
+                }
+
+                // handle record
+                try {
+                    for (int i=0; i<record.length; i++) {
+                        out.write((i!=0 ? "," : "") + record[i]);
+                    }
+                    out.write("\n");
+                } catch (Exception e) {
+                    System.err.println(e.getMessage());
+                }
+            }
+
+            try {
+                out.close();
+            } catch (Exception e) {
+                System.err.println(e.getMessage());
+            }
+        }
+
+        public void shutdown() {
+            this.shutdown = true;
+        }
+    }
+
+    protected class Worker extends Thread {
+        protected BlockingQueue<Map<String, Object>> in;
+        protected BlockingQueue<double[]> out;
+        protected byte[] queryRequest;
+        protected boolean shutdown;
+
+        public Worker(BlockingQueue in, BlockingQueue out, byte[] queryRequest) {
+            this.in = in;
+            this.out = out;
+            this.queryRequest = queryRequest;
+            this.shutdown = false;
+        }
+
+        @Override
+        public void run() {
+            while (!this.in.isEmpty() || !this.shutdown) {
+                Map<String, Object> node = null;
+                try {
+                    node = this.in.poll(5, TimeUnit.MILLISECONDS);
+                } catch (Exception e) {
+                    System.err.println(e.getMessage());
+                    continue;
+                }
+
+                if (node == null) {
+                    continue;
+                }
+
+                // parse node hostname and port
                 String hostname = node.get("hostname").toString();
                 short port = ((Long) node.get("port")).shortValue();
 
                 System.out.println("querying '" + hostname + ":" + port + "'");
 
                 // send QueryRequest
-                byte[] qResponseBytes = Main.sendMessage(hostname, port,
-                    MessageType.Query, queryRequest, null);
+                byte[] qResponseBytes;
+                try {
+                    qResponseBytes = Main.sendMessage(hostname, port,
+                        MessageType.Query, queryRequest, null);
+                } catch (Exception e) {
+                    System.err.println(e.getMessage());
+                    continue;
+                }
 
                 // parse QueryResponse
                 ByteBuffer qByteBuffer = ByteBuffer.wrap(qResponseBytes);
                 QueryResponse queryResponse =
                     QueryResponse.getRootAsQueryResponse(qByteBuffer);
-
-                if (!writerInitialized && queryResponse.featuresLength() != 0) {
-                    for (int i=0; i<queryResponse.featuresLength(); i++) {
-                        out.write((i == 0 ? "" : ",") + queryResponse.features(i));
-                    }
-                    out.write("\n");
-
-                    writerInitialized = true;
-                }
 
                 // read all data
                 FlatBufferBuilder dFlatBufferBuilder = new FlatBufferBuilder(1);
@@ -147,8 +262,14 @@ public class QueryCli implements Runnable {
                 // retrieve all data
                 while (true) {
                     // send DataRequest
-                    byte[] dResponseBytes = Main.sendMessage(hostname, port,
-                        MessageType.Data, dataRequest, null);
+                    byte[] dResponseBytes;
+                    try {
+                        dResponseBytes = Main.sendMessage(hostname, port,
+                            MessageType.Data, dataRequest, null);
+                    } catch (Exception e) {
+                        System.err.println(e.getMessage());
+                        break;
+                    }
 
                     // parse DataResponse
                     ByteBuffer dByteBuffer = ByteBuffer.wrap(dResponseBytes);
@@ -161,25 +282,26 @@ public class QueryCli implements Runnable {
                         bytes[i] = dataResponse.data(i);
                     }
 
-                    DataInputStream in =
-                        new DataInputStream(new ByteArrayInputStream(bytes));
-                    int bytesRead = 0;
-                    while (bytesRead < bytes.length) {
-                        double[] record = new double[queryResponse.featuresLength()];
-                        for (int i=0; i<record.length; i++) {
-                            record[i] = in.readDouble();
+                    try {
+                        DataInputStream dataIn =
+                            new DataInputStream(new ByteArrayInputStream(bytes));
+                        int bytesRead = 0;
+                        while (bytesRead < bytes.length) {
+                            double[] record = new double[queryResponse.featuresLength()];
+                            for (int i=0; i<record.length; i++) {
+                                record[i] = dataIn.readDouble();
+                            }
+
+                            // send record to out queue
+                            while (!this.out.offer(record)) {}
+                            bytesRead += record.length * 8;
                         }
 
-                        // write to BufferedReader
-                        for (int i=0; i<record.length; i++) {
-                            out.write((i == 0 ? "" : ",") + record[i]);
-                        }
-                        out.write("\n");
-
-                        bytesRead += record.length * 8;
+                        dataIn.close();
+                    } catch (Exception e) {
+                        System.err.println(e.getMessage());
+                        break;
                     }
-
-                    in.close();
 
                     // if no data returned -> break
                     if (dataResponse.dataLength() == 0) {
@@ -187,10 +309,10 @@ public class QueryCli implements Runnable {
                     }
                 }
             }
+        }
 
-            out.close();
-        } catch (Exception e) {
-            e.printStackTrace();
+        public void shutdown() {
+            this.shutdown = true;
         }
     }
 }

@@ -35,7 +35,6 @@ table QueryResponse {
 table WriterCloseRequest {
     filename:string;
 }
-
 table WriterCloseResponse {
 }
 
